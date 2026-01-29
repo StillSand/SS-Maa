@@ -182,14 +182,128 @@ cleanup_old_releases() {
     OLD_RELEASES=$(echo "$RELEASES" | tail -n +"$((KEEP_COUNT + 1))")
     
     # 删除旧版本
+    DELETED_COUNT=0
+    HAS_FAILURE=0
+    
+    # 禁用 set -e：删除操作可能失败，需要捕获错误信息并继续处理
+    set +e
+    
     echo "$OLD_RELEASES" | while read -r tag; do
         [ -n "$tag" ] && {
             log_info "删除旧版本：$tag"
-            gh release delete "$tag" -y --cleanup-tag
+            
+            # 捕获错误输出
+            ERROR_OUTPUT=$(gh release delete "$tag" -y --cleanup-tag 2>&1)
+            EXIT_CODE=$?
+            
+            if [ $EXIT_CODE -eq 0 ]; then
+                log_success "已删除：$tag (包括 tag)"
+                DELETED_COUNT=$((DELETED_COUNT + 1))
+            else
+                log_error "删除失败：$tag"
+                log_error "错误信息：$ERROR_OUTPUT"
+                HAS_FAILURE=1
+            fi
         }
     done
     
-    log_success "旧版本清理完成"
+    # 恢复 set -e
+    set -e
+    
+    if [ $HAS_FAILURE -eq 1 ]; then
+        log_warning "部分 release 删除失败，将尝试清理残留的 tag"
+    else
+        log_success "旧版本清理完成"
+    fi
+}
+
+# ==================== 清理残留的 tag ====================
+cleanup_orphaned_tags() {
+    log_info "检查残留的 tag..."
+    
+    # 获取所有 snapshot 开头的 tag
+    set +e
+    ALL_TAGS=$(git ls-remote --tags origin 2>&1 | grep "refs/tags/${SNAPSHOT_PREFIX}-" | awk -F'/' '{print $3}' | sed 's/\^{}//')
+    set -e
+    
+    if [ -z "$ALL_TAGS" ]; then
+        log_info "没有找到任何 ${SNAPSHOT_PREFIX} tag"
+        return
+    fi
+    
+    # 获取所有 release 的 tag
+    set +e
+    RELEASE_TAGS=$(list_snapshot_releases "$SNAPSHOT_PREFIX" false)
+    set -e
+    
+    # 找出没有对应 release 的 tag（孤立 tag）
+    ORPHANED_TAGS=""
+    while read -r tag; do
+        [ -n "$tag" ] && {
+            if ! echo "$RELEASE_TAGS" | grep -q "^${tag}$"; then
+                ORPHANED_TAGS="${ORPHANED_TAGS}${tag}\n"
+            fi
+        }
+    done <<< "$ALL_TAGS"
+    
+    if [ -z "$ORPHANED_TAGS" ]; then
+        log_info "没有残留的 tag"
+        return
+    fi
+    
+    # 计算有多少个孤立 tag
+    ORPHANED_COUNT=$(echo -e "$ORPHANED_TAGS" | grep -v '^$' | wc -l)
+    
+    log_warning "发现 $ORPHANED_COUNT 个孤立 tag（没有对应的 release）"
+    log_warning "孤立 tag 列表："
+    
+    # 禁用 set -e：管道操作可能失败导致脚本退出
+    set +e
+    echo -e "$ORPHANED_TAGS" | grep -v '^$' | while read -r tag; do
+        [ -n "$tag" ] && log_warning "  - $tag"
+    done
+    set -e
+    
+    echo ""
+    
+    # 删除孤立的 tag
+    log_info "开始删除残留 tag..."
+    DELETED_TAG_COUNT=0
+    HAS_FAILURE=0
+    
+    # 禁用 set -e：删除操作可能失败，需要捕获错误信息并继续处理
+    set +e
+    
+    # 使用 while read 从 here-string 读取，避免管道导致的子 shell 问题
+    while IFS= read -r tag; do
+        if [ -n "$tag" ]; then
+            log_info "准备删除 tag：$tag"
+            
+            # 捕获错误输出
+            ERROR_OUTPUT=$(git push origin --delete "refs/tags/${tag}" 2>&1)
+            EXIT_CODE=$?
+            
+            if [ $EXIT_CODE -eq 0 ]; then
+                log_success "已删除 tag：$tag"
+                DELETED_TAG_COUNT=$((DELETED_TAG_COUNT + 1))
+            else
+                log_error "删除 tag 失败：$tag"
+                log_error "错误信息：$ERROR_OUTPUT"
+                HAS_FAILURE=1
+            fi
+        fi
+    done <<< "$(echo -e "$ORPHANED_TAGS" | grep -v '^$')"
+    
+    # 恢复 set -e
+    set -e
+    
+    # 检查是否有失败
+    if [ $HAS_FAILURE -eq 1 ]; then
+        log_error "部分 tag 删除失败，请查看上面的错误信息"
+        return 1
+    fi
+    
+    log_success "tag 清理完成，已删除 $DELETED_TAG_COUNT 个残留 tag"
 }
 
 # ==================== 主函数 ====================
@@ -220,6 +334,9 @@ main() {
     
     # 7. 清理旧版本
     cleanup_old_releases
+    
+    # 8. 清理残留的 tag
+    cleanup_orphaned_tags
     
     echo ""
     log_success "=========================================="

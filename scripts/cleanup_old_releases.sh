@@ -36,7 +36,7 @@ source "${SCRIPT_DIR}/common_functions.sh"
 
 # ==================== 配置 ====================
 SNAPSHOT_PREFIX="snapshot"
-KEEP_COUNT=2  # 保留最近几个版本（包括 release 和孤立 tag）
+KEEP_COUNT=2  # 保留最近几个 release（孤立 tag 会被全部删除）
 
 # ==================== 检查依赖 ====================
 check_dependencies() {
