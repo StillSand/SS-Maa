@@ -1,0 +1,237 @@
+name: Test Individual Steps
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_restore:
+        description: '测试恢复容器（从 Release 下载）'
+        required: false
+        default: false
+        type: boolean
+      test_setup_container:
+        description: '测试设置容器（需要先恢复容器）'
+        required: false
+        default: false
+        type: boolean
+      use_default_image:
+        description: '使用默认镜像（跳过恢复容器，测试全新镜像）'
+        required: false
+        default: false
+        type: boolean
+      test_install_maa:
+        description: '测试安装 MAA'
+        required: false
+        default: false
+        type: boolean
+      test_install_game:
+        description: '测试安装游戏（需要先设置容器）'
+        required: false
+        default: false
+        type: boolean
+      test_setup_tunnel:
+        description: '测试设置 Cloudflare Tunnel'
+        required: false
+        default: false
+        type: boolean
+      test_export:
+        description: '测试导出容器（需要先设置容器）'
+        required: false
+        default: false
+        type: boolean
+      test_backup:
+        description: '测试备份到 Release（需要先导出容器）'
+        required: false
+        default: false
+        type: boolean
+      test_cleanup:
+        description: '测试清理旧 Release（独立测试，无需其他步骤）'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  TZ: Asia/Shanghai
+  CLIENT_TYPE: Official
+
+jobs:
+  test:
+    name: Test Steps
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    environment:
+      name: production
+    
+    steps:
+      - name: ✅ 检查输入
+        run: |
+          echo "=========================================="
+          echo "📋 测试步骤选择："
+          echo "=========================================="
+          echo "恢复容器: ${{ github.event.inputs.test_restore }}"
+          echo "设置容器: ${{ github.event.inputs.test_setup_container }}"
+          echo "使用默认镜像: ${{ github.event.inputs.use_default_image }}"
+          echo "安装 MAA: ${{ github.event.inputs.test_install_maa }}"
+          echo "安装游戏: ${{ github.event.inputs.test_install_game }}"
+          echo "设置 Tunnel: ${{ github.event.inputs.test_setup_tunnel }}"
+          echo "导出容器: ${{ github.event.inputs.test_export }}"
+          echo "备份到 Release: ${{ github.event.inputs.test_backup }}"
+          echo "清理旧 Release: ${{ github.event.inputs.test_cleanup }}"
+          echo "=========================================="
+          echo ""
+          
+          # 检查是否至少选择了一个步骤
+          if [ "${{ github.event.inputs.test_restore }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_setup_container }}" != "true" ] && \
+             [ "${{ github.event.inputs.use_default_image }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_install_maa }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_install_game }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_setup_tunnel }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_export }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_backup }}" != "true" ] && \
+             [ "${{ github.event.inputs.test_cleanup }}" != "true" ]; then
+            echo "⚠️  警告：未选择任何测试步骤"
+            echo "💡 提示：这次运行不会执行任何实际操作"
+          fi
+          
+          # 检查依赖关系
+          if [ "${{ github.event.inputs.test_setup_container }}" == "true" ] && \
+             [ "${{ github.event.inputs.test_restore }}" != "true" ] && \
+             [ "${{ github.event.inputs.use_default_image }}" != "true" ]; then
+            echo "⚠️  警告：设置容器需要先恢复容器（或勾选'使用默认镜像'）"
+            echo "💡 建议：同时勾选 '测试恢复容器' 或 '使用默认镜像'"
+          fi
+          
+          if [ "${{ github.event.inputs.test_install_game }}" == "true" ] && \
+             [ "${{ github.event.inputs.test_setup_container }}" != "true" ]; then
+            echo "⚠️  警告：安装游戏需要先设置容器"
+            echo "💡 建议：同时勾选 '测试设置容器' 和 '测试恢复容器'"
+          fi
+          
+          if [ "${{ github.event.inputs.test_export }}" == "true" ] && \
+             [ "${{ github.event.inputs.test_setup_container }}" != "true" ]; then
+            echo "⚠️  警告：导出容器需要先设置容器"
+            echo "💡 建议：同时勾选 '测试设置容器' 和 '测试恢复容器'"
+          fi
+          
+          if [ "${{ github.event.inputs.test_backup }}" == "true" ] && \
+             [ "${{ github.event.inputs.test_export }}" != "true" ]; then
+            echo "⚠️  警告：备份到 Release 需要先导出容器"
+            echo "💡 建议：同时勾选 '测试导出容器'、'测试设置容器' 和 '测试恢复容器'"
+          fi
+          
+          echo ""
+          echo "✅ 输入检查完成"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 设置脚本权限
+        if: |
+          github.event.inputs.test_restore == 'true' ||
+          github.event.inputs.test_setup_container == 'true' ||
+          github.event.inputs.test_install_maa == 'true' ||
+          github.event.inputs.test_install_game == 'true' ||
+          github.event.inputs.test_setup_tunnel == 'true' ||
+          github.event.inputs.test_export == 'true' ||
+          github.event.inputs.test_backup == 'true'
+        run: |
+          chmod +x scripts/*.sh
+          sudo cp scripts/*.sh /usr/local/bin/
+
+      - name: 准备环境
+        if: |
+          github.event.inputs.test_restore == 'true' ||
+          github.event.inputs.test_setup_container == 'true' ||
+          github.event.inputs.test_install_maa == 'true' ||
+          github.event.inputs.test_install_game == 'true' ||
+          github.event.inputs.test_setup_tunnel == 'true' ||
+          github.event.inputs.test_export == 'true' ||
+          github.event.inputs.test_backup == 'true'
+        run: prepare_env.sh
+
+      # ==================== 步骤 1: 恢复容器 ====================
+      - name: 🔄 [1/8] 测试恢复容器
+        if: github.event.inputs.test_restore == 'true' && github.event.inputs.use_default_image != 'true'
+        env:
+          CONTAINER_ENCRYPTION_KEY: ${{ secrets.CONTAINER_ENCRYPTION_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: restore_from_release.sh
+
+      # ==================== 步骤 2: 设置容器 ====================
+      - name: 🐳 [2/8] 测试设置容器
+        if: github.event.inputs.test_setup_container == 'true'
+        env:
+          USE_DEFAULT_IMAGE: ${{ github.event.inputs.use_default_image }}
+        run: setup_container.sh 180
+
+      # ==================== 步骤 3: 安装 MAA ====================
+      - name: 📦 [3/8] 测试安装 MAA
+        if: github.event.inputs.test_install_maa == 'true'
+        run: install_maa.sh
+
+      # ==================== 步骤 4: 安装游戏 ====================
+      - name: 🎮 [4/8] 测试安装游戏
+        if: github.event.inputs.test_install_game == 'true'
+        run: install_game.sh "${{ env.CLIENT_TYPE }}"
+
+      # ==================== 步骤 5: 设置 Tunnel ====================
+      - name: 🔒 [5/8] 测试设置 Cloudflare Tunnel
+        if: github.event.inputs.test_setup_tunnel == 'true'
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+        run: setup_tunnel.sh
+
+      # ==================== 步骤 6: 导出容器 ====================
+      - name: 💾 [6/8] 测试导出容器
+        if: github.event.inputs.test_export == 'true'
+        run: export_container.sh
+
+      # ==================== 步骤 7: 备份到 Release ====================
+      - name: 📤 [7/8] 测试备份到 Release
+        if: github.event.inputs.test_backup == 'true'
+        env:
+          CONTAINER_ENCRYPTION_KEY: ${{ secrets.CONTAINER_ENCRYPTION_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: backup_to_release.sh
+
+      # ==================== 步骤 8: 清理旧 Release ====================
+      - name: 🧹 [8/8] 测试清理旧 Release
+        if: github.event.inputs.test_cleanup == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 确保 gh 命令可用
+          if ! command -v gh &> /dev/null; then
+            echo "安装 GitHub CLI..."
+            sudo apt update -qq
+            sudo apt install -y gh
+          fi
+          
+          # 运行清理脚本
+          bash scripts/cleanup_old_releases.sh
+
+      # ==================== 测试总结 ====================
+      - name: 📊 测试总结
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "📊 测试结果总结"
+          echo "=========================================="
+          echo ""
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ 所有选中的测试步骤都通过了！"
+          else
+            echo "❌ 部分测试步骤失败"
+            echo ""
+            echo "💡 提示："
+            echo "  - 查看上面的日志找到失败的步骤"
+            echo "  - 检查是否选择了所有必需的依赖步骤"
+            echo "  - 可以单独测试失败的步骤进行调试"
+          fi
+          
+          echo ""
+          echo "=========================================="
+          echo ""

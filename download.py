@@ -22,4 +22,4 @@ if __name__ == '__main__':
     elif client_type == 'Bilibili':
         link = bili()
     print(link)
-    os.system('wget ' + link + ' -O arknights.apk --quiet')
+    os.system('wget ' + link + ' -O arknights.apk --show-progress')

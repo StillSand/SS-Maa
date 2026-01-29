@@ -1,0 +1,24 @@
+正确的 Cloudflare Tunnel Public Hostname 配置：
+
+┌─────────────────────────────────────────┐
+│ Public Hostname 配置                     │
+├─────────────────────────────────────────┤
+│ Subdomain:  maa                         │
+│ Domain:     你的域名.com                 │
+│ Path:       (留空)                       │
+│                                         │
+│ Service:                                │
+│   Type:     HTTP                        │
+│   URL:      localhost:8000              │
+└─────────────────────────────────────────┘
+
+重要提示：
+1. Service Type 必须是 HTTP（不是 HTTPS）
+2. URL 必须是 localhost:8000（不要加 http:// 或 https://）
+3. Path 必须留空
+4. 端口必须是 8000（ws-scrcpy 监听的端口）
+
+如果还是 502 错误，可能的原因：
+1. ws-scrcpy 服务还没完全启动（等待 1-2 分钟）
+2. Cloudflare Tunnel 连接还没建立（检查 GitHub Actions 日志）
+3. 防火墙阻止了连接（通常不会发生在 GitHub Actions 环境）

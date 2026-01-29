@@ -14,7 +14,7 @@ type = "Fight"
 
 [[tasks.variants]]
 condition = { type = "Weekday", weekdays = [ "Mon" ] }
-params = { stage = "Annihilation", client_type = "Official", expiring_medicine = 999 }
+params = { stage = "LungmenOutskirts@Annihilation", client_type = "Official", expiring_medicine = 999, times = 6 }
 
 [[tasks.variants]]
 params = { stage = "1-7", series = 6, client_type = "Official", expiring_medicine = 999 }
@@ -32,7 +32,7 @@ params = { mode = 0, facility = ["Office", "Mfg", "Trade", "Control", "Power", "
 [[tasks]]
 name = "信用商店"
 type = "Mall"
-params = { shopping = true, buy_first = ["固源岩", "招聘许可", "技巧概要", "家具"], blacklist = ["碳", "加急许可"], force_shopping_if_credit_full = true, reserve_max_credit = true }
+params = { visit_friends = true, shopping = true, buy_first = ["固源岩", "招聘许可", "技巧概要", "家具"], blacklist = ["碳", "加急许可"], force_shopping_if_credit_full = true, reserve_max_credit = true }
 
 [[tasks]]
 name = "领取奖励"

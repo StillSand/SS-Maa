@@ -1,0 +1,61 @@
+name: Restore from Cache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    environment:
+      name: production
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 恢复缓存
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ./ark.tar
+            ./data.tar
+          key: redroid-
+      
+      - name: 检查文件
+        run: |
+          if [ ! -f "ark.tar" ] || [ ! -f "data.tar" ]; then
+            echo "错误：未找到缓存文件"
+            exit 1
+          fi
+          echo "ark.tar: $(du -h ark.tar | cut -f1)"
+          echo "data.tar: $(du -h data.tar | cut -f1)"
+      
+      - name: 安装依赖
+        run: |
+          sudo apt update > /dev/null 2>&1
+          sudo apt install -y p7zip-full gh > /dev/null 2>&1
+      
+      - name: 压缩加密
+        env:
+          ENCRYPTION_KEY: ${{ secrets.CONTAINER_ENCRYPTION_KEY }}
+        run: |
+          echo "开始压缩和加密..."
+          7z a -p"$ENCRYPTION_KEY" -v1900m -mhe=on -mx=0 -mmt=on container.7z ark.tar data.tar
+          
+          echo "生成的文件："
+          ls -lh container.7z.* | awk '{print $9 " (" $5 ")"}'
+      
+      - name: 创建 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG="snapshot-$(date -u +%Y%m%d-%H%M)"
+          echo "创建 Release: $RELEASE_TAG"
+          
+          gh release create "$RELEASE_TAG" \
+            container.7z.* \
+            --title "Container Snapshot $(date -u +%Y-%m-%d\ %H:%M) UTC" \
+            --notes "从 Actions Cache 恢复的备份"
+          
+          echo "✅ Release 创建完成: $RELEASE_TAG"
