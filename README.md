@@ -1,4 +1,4 @@
-# SS-Maa
+# maa
 
 > 基于 [Lyxot/maa-template](https://github.com/Lyxot/maa-template) 魔改
 
