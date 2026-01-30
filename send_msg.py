@@ -18,7 +18,7 @@ url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 data = {
     "chat_id": chat_id,
     "text": message,
-    "parse_mode": "Markdown"  # 使用 Markdown 而不是 MarkdownV2
+    "parse_mode": "HTML"  # 使用 HTML 格式，支持代码块
 }
 
 try:

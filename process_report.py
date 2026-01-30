@@ -46,6 +46,8 @@ def generate_github_summary(data):
     
     with open(github_step_summary, 'w', encoding='utf-8') as f:
         f.write("# 🎮 MAA 执行报告\n\n")
+        if start_date:
+            f.write(f"**📅 执行日期:** {start_date}\n\n")
         f.write("---\n\n")
         
         # 显示完整的 Summary 部分
@@ -76,18 +78,22 @@ def generate_telegram_message(data):
         print("⚠️  TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID 未配置，跳过 Telegram 消息生成")
         return False
     
-    # 提取日期部分（YYYY-MM-DD）
+# 提取日期部分（YYYY-MM-DD）
     start_date = data['start_time'].split()[0] if data['start_time'] != "未知" else None
     formatted_summary = format_for_telegram(data['summary'], start_date)
-    
+
     # 构建消息
-    message = f"""🎮 **MAA 自动化执行报告**
+    message = f"""🎮 MAA 自动化执行报告
 
-🕐 **开始:** {data['start_time']} | 🏁 **结束:** {data['end_time']} | ⏱️ **耗时:** {data['duration']}
+📅 <b>执行日期:</b> {start_date if start_date else '未知'}
 
-📊 **任务详情:**
+🕐 <b>开始:</b> {data['start_time']} | 🏁 <b>结束:</b> {data['end_time']} | ⏱️ <b>耗时:</b> {data['duration']}
 
+📊 <b>任务详情:</b>
+
+<pre>
 {formatted_summary}
+</pre>
 """
     
     # 保存到文件供 send_msg.py 使用

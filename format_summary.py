@@ -76,8 +76,8 @@ def parse_summary(summary_text, start_date=None):
                                 status_display = '❌ Failed'
                             else:
                                 status_display = f'⚠️ {status}'
-                            
-                            title = f"[{task_name_match}] 🕐 **开始:** {start_date} {start_time} | 🏁 **结束:** {start_date} {end_time} | ⏱️ **耗时:** {duration} | {status_display}"
+
+                            title = f"[{task_name_match}] 🕐 {start_time}-{end_time} ({duration}) | {status_display}"
                     
                     # 创建新任务
                     current_task = {
@@ -131,7 +131,7 @@ def format_task_details(details, use_table=True):
                 formatted.append('| 编号 | 稀有度 | 标签 | 状态 |')
                 formatted.append('|------|--------|------|------|')
             else:
-                formatted.append('*检测到的标签：*')
+                formatted.append('检测到的标签：')
             
             i += 1
             while i < len(details):
@@ -206,7 +206,7 @@ def format_task_details(details, use_table=True):
             if use_table:
                 formatted.append(f'**{fight_info}**\n')
             else:
-                formatted.append(f'*{fight_info}*')
+                formatted.append(f'{fight_info}')
             
             # 收集所有掉落行
             drop_lines = []
@@ -263,13 +263,13 @@ def format_task_details(details, use_table=True):
             if i < len(details) and 'total drops:' in details[i].strip():
                 total_line = details[i].strip()
                 total_items_text = total_line.replace('total drops:', '').strip()
-                
+
                 formatted.append('')
                 if use_table:
                     formatted.append('**📦 总计掉落：**\n')
                     formatted.append('| 物品 | 总数量 |')
                     formatted.append('|------|--------|')
-                    
+
                     # 解析总计物品
                     total_items = [item.strip() for item in total_items_text.split(',')]
                     for item in total_items:
@@ -279,7 +279,7 @@ def format_task_details(details, use_table=True):
                             item_count = item_parts[1] if len(item_parts) > 1 else '1'
                             formatted.append(f'| {item_name} | {item_count} |')
                 else:
-                    formatted.append('*📦 总计掉落：*')
+                    formatted.append('📦 总计掉落：')
                     formatted.append(f'  {total_items_text}')
                 
                 i += 1
@@ -304,7 +304,7 @@ def format_task_details(details, use_table=True):
                 formatted.append('| 设施类型 | 干员 |')
                 formatted.append('|----------|------|')
             else:
-                formatted.append('*基建设施：*')
+                formatted.append('基建设施：')
             
             for fac_line in facility_lines:
                 fac_stripped = fac_line.strip()
@@ -340,78 +340,66 @@ def format_task_details(details, use_table=True):
 
 
 
-def format_for_github(summary_text, start_date=None):
+def format_summary(summary_text, start_date=None, platform='github'):
     """
-    格式化为 GitHub Actions Summary (Markdown)
-    
+    统一的摘要格式化函数
+
     Args:
         summary_text: MAA 摘要文本
         start_date: 开始日期（格式：YYYY-MM-DD），用于补全任务时间
-        
+        platform: 平台类型，'github' 或 'telegram'
+
     Returns:
-        str: Markdown 格式的文本
+        str: 格式化后的文本
     """
     tasks = parse_summary(summary_text, start_date)
-    
+
     if not tasks:
-        return "*无报告信息*\n"
-    
+        return "*无报告信息*\n" if platform == 'github' else '无报告信息'
+
     lines = []
-    for i, task in enumerate(tasks, 1):
+    for i, task in enumerate(tasks):
         icon = TASK_ICONS.get(task['name'], '📋')
-        
-        # 任务标题（不在代码块内，不可复制）
-        lines.append(f"### {icon} 任务 {i}: {task['title']}\n")
-        
-        # 任务详情（使用折叠块，表格在外面可以渲染）
-        if task['details']:
-            lines.append("<details open>")
-            lines.append("<summary>📋 详细信息</summary>\n")
-            
-            # 格式化详情（表格会在 Markdown 中渲染）
-            formatted_details = format_task_details(task['details'])
-            for detail in formatted_details:
-                lines.append(detail)
-            
-            lines.append("\n</details>\n")
-        # 如果没有详细信息，不显示任何内容
-    
+
+        if platform == 'github':
+            # GitHub 格式：Markdown 表格 + 折叠块
+            lines.append(f"### {icon} 任务 {i+1}: {task['title']}\n")
+
+            if task['details']:
+                lines.append("<details open>")
+                lines.append("<summary>📋 详细信息</summary>\n")
+
+                formatted_details = format_task_details(task['details'], use_table=True)
+                lines.extend(formatted_details)
+
+                lines.append("\n</details>\n")
+        else:
+            # Telegram 格式：纯文本（在代码块中显示）
+            if i > 0:
+                lines.append('')
+
+            lines.append(f"{icon} 任务 {i+1}: {task['name']}")
+            lines.append(f"   {task['title'].replace('**', '').replace('[', '').replace(']', '')}")
+
+            if task['details']:
+                formatted_details = format_task_details(task['details'], use_table=False)
+                lines.extend(formatted_details)
+
     return '\n'.join(lines)
+
+
+# 向后兼容的别名函数
+def format_for_github(summary_text, start_date=None):
+    """
+    格式化为 GitHub Actions Summary (Markdown)
+    向后兼容函数，调用 format_summary
+    """
+    return format_summary(summary_text, start_date, platform='github')
 
 
 def format_for_telegram(summary_text, start_date=None):
     """
-    格式化为 Telegram 消息 (纯文本，不使用表格)
-    
-    Args:
-        summary_text: MAA 摘要文本
-        start_date: 开始日期（格式：YYYY-MM-DD），用于补全任务时间
-        
-    Returns:
-        str: 纯文本格式的消息
+    格式化为 Telegram 消息 (纯文本，不使用表格，适合在代码块中显示)
+    向后兼容函数，调用 format_summary
     """
-    tasks = parse_summary(summary_text, start_date)
-    
-    if not tasks:
-        return '无报告信息'
-    
-    lines = []
-    for i, task in enumerate(tasks):
-        icon = TASK_ICONS.get(task['name'], '📋')
-        
-        # 任务之间添加空行（第一个任务除外）
-        if i > 0:
-            lines.append('')
-        
-        # 任务标题
-        lines.append(f"{icon} *{task['name']}*")
-        lines.append(task['title'].replace('**', '').replace('[', '').replace(']', ''))
-        
-        # 任务详情（只有存在详情时才显示）
-        if task['details']:
-            formatted_details = format_task_details(task['details'], use_table=False)
-            for detail in formatted_details:
-                lines.append(detail)
-        # 如果没有详细信息，不显示任何内容
-    
-    return '\n'.join(lines)
+    return format_summary(summary_text, start_date, platform='telegram')
